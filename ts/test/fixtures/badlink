@@ -1,1 +1,53 @@
+'
+'  <?php
+'  -  /**
+'  *.js:
+'  *.ts:
+'  const outDir = 'build';
+'  const sources = ['ts/lib/**/*.ts'];
+'  const tests = ['ts/test/**/*.ts'];
+'  const mocha = require('gulp-mocha');
+'  const sourcemaps = require('gulp-sourcemaps');
+'  const ts = require('gulp-typescript');
+'  const tslint = require('gulp-tslint');
+' gulpfile.js -> ..
+
+' @0072016
+' https://developers.google.com
+' foo.gradle@gmail.com
+' 2017-07-20T23:10:17
+
+
+
+?>
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ./noexists.json
