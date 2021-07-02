@@ -71,7 +71,11 @@ export class JWTAccess {
    * include in the payload.
    * @returns An object that includes the authorization header.
    */
-  getRequestHeaders(url: string, additionalClaims?: Claims): Headers {
+  getRequestHeaders(
+    url: string,
+    additionalClaims?: Claims,
+    scopes?: string | string[]
+  ): Headers {
     // Return cached authorization headers, unless we are within
     // eagerRefreshThresholdMillis ms of them expiring:
     const cachedToken = this.cache.get(url);
@@ -85,16 +89,32 @@ export class JWTAccess {
     const iat = Math.floor(Date.now() / 1000);
     const exp = JWTAccess.getExpirationTime(iat);
 
-    // The payload used for signed JWT headers has:
-    // iss == sub == <client email>
-    // aud == <the authorization uri>
-    const defaultClaims = {
-      iss: this.email,
-      sub: this.email,
-      aud: url,
-      exp,
-      iat,
-    };
+    let defaultClaims;
+    // Turn scopes into space-separated string
+    if (Array.isArray(scopes)) {
+      scopes = scopes.join(' ');
+    }
+
+    // If scopes are specified, sign with scopes
+    if (scopes) {
+      defaultClaims = {
+        iss: this.email,
+        sub: this.email,
+        scope: scopes,
+        exp,
+        iat,
+      };
+    } else {
+      // If either scopes are not specified, or if audience is something unique,
+      // just use default service endpoint.
+      defaultClaims = {
+        iss: this.email,
+        sub: this.email,
+        aud: url,
+        exp,
+        iat,
+      };
+    }
 
     // if additionalClaims are provided, ensure they do not collide with
     // other required claims.

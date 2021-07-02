@@ -56,6 +56,22 @@ describe('jwtaccess', () => {
     assert.strictEqual(testUri, payload.aud);
   });
 
+  it('getRequestHeaders should sign with scopes if user supplied scopes', () => {
+    const client = new JWTAccess(email, keys.private);
+    const headers = client.getRequestHeaders(testUri, undefined, 'myfakescope');
+    const decoded = jws.decode(headers.Authorization.replace('Bearer ', ''));
+    const payload = decoded.payload;
+    assert.strictEqual('myfakescope', payload.scope);
+  });
+
+  it('getRequestHeaders should sign with default if user did not supply scopes', () => {
+    const client = new JWTAccess(email, keys.private);
+    const headers = client.getRequestHeaders(testUri);
+    const decoded = jws.decode(headers.Authorization.replace('Bearer ', ''));
+    const payload = decoded.payload;
+    assert.strictEqual(testUri, payload.aud);
+  });
+
   it('getRequestHeaders should set key id in header when available', () => {
     const client = new JWTAccess(email, keys.private, '101');
     const headers = client.getRequestHeaders(testUri);

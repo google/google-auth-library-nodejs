@@ -46,8 +46,9 @@ export class JWT extends OAuth2Client implements IdTokenProvider {
   subject?: string;
   gtoken?: GoogleToken;
   additionalClaims?: {};
-
   private access?: JWTAccess;
+  useJWTAccessAlways?: boolean;
+  defaultServicePath?: string;
 
   /**
    * JWT service account credentials.
@@ -121,44 +122,63 @@ export class JWT extends OAuth2Client implements IdTokenProvider {
   protected async getRequestMetadataAsync(
     url?: string | null
   ): Promise<RequestMetadataResponse> {
-    if (!this.apiKey && !this.hasUserScopes() && url) {
-      if (
-        this.additionalClaims &&
-        (
-          this.additionalClaims as {
-            target_audience: string;
-          }
-        ).target_audience
-      ) {
-        const {tokens} = await this.refreshToken();
-        return {
-          headers: this.addSharedMetadataHeaders({
-            Authorization: `Bearer ${tokens.id_token}`,
-          }),
-        };
-      } else {
-        // no scopes have been set, but a uri has been provided. Use JWTAccess
-        // credentials.
-        if (!this.access) {
-          this.access = new JWTAccess(
-            this.email,
-            this.key,
-            this.keyId,
-            this.eagerRefreshThresholdMillis
-          );
-        }
-        const headers = await this.access.getRequestHeaders(
-          url,
-          this.additionalClaims
+    if (this.useJWTAccessAlways) {
+      if (!this.access) {
+        this.access = new JWTAccess(
+          this.email,
+          this.key,
+          this.keyId,
+          this.eagerRefreshThresholdMillis
         );
-        return {headers: this.addSharedMetadataHeaders(headers)};
       }
-    } else if (this.hasAnyScopes() || this.apiKey) {
-      return super.getRequestMetadataAsync(url);
+
+      const audience = `https://${this.defaultServicePath}/`;
+      const headers = await this.access.getRequestHeaders(
+        audience,
+        this.additionalClaims,
+        this.scopes
+      );
+      return {headers: this.addSharedMetadataHeaders(headers)};
     } else {
-      // If no audience, apiKey, or scopes are provided, we should not attempt
-      // to populate any headers:
-      return {headers: {}};
+      if (!this.apiKey && !this.hasUserScopes() && url) {
+        if (
+          this.additionalClaims &&
+          (
+            this.additionalClaims as {
+              target_audience: string;
+            }
+          ).target_audience
+        ) {
+          const {tokens} = await this.refreshToken();
+          return {
+            headers: this.addSharedMetadataHeaders({
+              Authorization: `Bearer ${tokens.id_token}`,
+            }),
+          };
+        } else {
+          // no scopes have been set, but a uri has been provided. Use JWTAccess
+          // credentials.
+          if (!this.access) {
+            this.access = new JWTAccess(
+              this.email,
+              this.key,
+              this.keyId,
+              this.eagerRefreshThresholdMillis
+            );
+          }
+          const headers = await this.access.getRequestHeaders(
+            url,
+            this.additionalClaims
+          );
+          return {headers: this.addSharedMetadataHeaders(headers)};
+        }
+      } else if (this.hasAnyScopes() || this.apiKey) {
+        return super.getRequestMetadataAsync(url);
+      } else {
+        // If no audience, apiKey, or scopes are provided, we should not attempt
+        // to populate any headers:
+        return {headers: {}};
+      }
     }
   }
 

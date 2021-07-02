@@ -13,3 +13,4 @@ package-lock.json
 yarn.lock
 dist/
 __pycache__
+.DS_Store

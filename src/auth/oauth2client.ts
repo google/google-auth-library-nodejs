@@ -391,6 +391,7 @@ export interface OAuth2ClientOptions extends RefreshOptions {
   clientId?: string;
   clientSecret?: string;
   redirectUri?: string;
+  useJWTAccessAlways?: boolean;
 }
 
 export interface RefreshOptions {

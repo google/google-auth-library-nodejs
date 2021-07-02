@@ -790,6 +790,38 @@ describe('jwt', () => {
       sandbox.restore();
     });
 
+    it('uses self signed JWT when useJWTAccessAlways is set', async () => {
+      const stubJWTAccess = sandbox.stub(jwtaccess, 'JWTAccess').returns({
+        getRequestHeaders: sinon.stub().returns({}),
+      });
+      const jwt = new JWT({
+        email: 'foo@serviceaccount.com',
+        key: fs.readFileSync(PEM_PATH, 'utf8'),
+        scopes: [],
+        subject: 'bar@subjectaccount.com',
+      });
+      jwt.useJWTAccessAlways = true;
+      await jwt.getRequestHeaders('https//beepboop.googleapis.com');
+      sandbox.assert.calledOnce(stubJWTAccess);
+    });
+
+    it('always passes default endpoint for useJWTAccessAlways', async () => {
+      const stubJWTAccess = sandbox.spy(
+        jwtaccess.JWTAccess.prototype,
+        'getRequestHeaders'
+      );
+      const jwt = new JWT({
+        email: 'foo@serviceaccount.com',
+        key: fs.readFileSync(PEM_PATH, 'utf8'),
+        scopes: [],
+        subject: 'bar@subjectaccount.com',
+      });
+      jwt.useJWTAccessAlways = true;
+      jwt.defaultServicePath = 'a/b/c';
+      await jwt.getRequestHeaders('https//beepboop.googleapis.com');
+      sandbox.assert.calledWith(stubJWTAccess, 'https://a/b/c/');
+    });
+
     it('uses self signed JWT when no scopes are provided', async () => {
       const stubJWTAccess = sandbox.stub(jwtaccess, 'JWTAccess').returns({
         getRequestHeaders: sinon.stub().returns({}),
