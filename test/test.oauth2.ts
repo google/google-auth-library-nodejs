@@ -25,6 +25,7 @@ import * as sinon from 'sinon';
 
 import {CodeChallengeMethod, OAuth2Client} from '../src';
 import {LoginTicket} from '../src/auth/loginticket';
+import {DownscopedAccessTokenResponse} from '../src/auth/oauth2client';
 
 nock.disableNetConnect();
 
@@ -1149,6 +1150,36 @@ describe('oauth2', () => {
           done();
         });
       });
+
+      it('should call refreshHandler and set credential if token expires in request()', async () => {
+        const scope = nock('http://example.com')
+          .get('/access')
+          .reply(code, {
+            error: {code, message: 'Invalid Credentials'},
+          });
+        const expectedDownscopedCred = {
+          access_token: 'access_token',
+          expiry_date: 123456789,
+        };
+        client.refreshHandler = async () => {
+          return expectedDownscopedCred;
+        };
+        client.setCredentials({
+          access_token: 'initial-access-token',
+          expiry_date: new Date().getTime() - 1000,
+        });
+        await client.request({url: 'http://example.com'}, () => {
+          scope.done();
+          assert.strictEqual(
+            client.credentials.access_token,
+            expectedDownscopedCred.access_token
+          );
+          assert.strictEqual(
+            client.credentials.expiry_date,
+            expectedDownscopedCred.expiry_date
+          );
+        });
+      });
     });
 
     it('should not retry requests with streaming data', done => {
@@ -1338,6 +1369,27 @@ describe('oauth2', () => {
       assert.deepStrictEqual(info.scopes, tokenInfo.scope.split(' '));
     });
 
+    it('should refresh request header when refreshHandler is available', async () => {
+      const expectedDownscopedCred = {
+        access_token: 'access_token',
+        expiry_date: 123456789,
+      };
+      client.refreshHandler = async () => {
+        return expectedDownscopedCred;
+      };
+      client.setCredentials({
+        access_token: 'initial-access-token',
+        expiry_date: new Date().getTime() - 1000,
+      });
+      const expectedMetadata = {
+        Authorization: 'Bearer access_token',
+      };
+      const requestMetaData = await client.getRequestHeaders(
+        'http://example.com'
+      );
+      assert.deepStrictEqual(requestMetaData, expectedMetadata);
+    });
+
     it('should throw if tries to refresh but no refresh token is available', async () => {
       client.setCredentials({
         access_token: 'initial-access-token',
@@ -1346,6 +1398,45 @@ describe('oauth2', () => {
       await assert.rejects(
         client.getRequestHeaders('http://example.com'),
         /No refresh token is set./
+      );
+    });
+
+    it('should call refreshHandler and set credential if providing refresh handler callback', async () => {
+      const expectedDownscopedCred = {
+        access_token: 'access_token',
+        expiry_date: 123456789,
+      };
+      client.refreshHandler = async () => {
+        return expectedDownscopedCred;
+      };
+      const downscopedCred =
+        (await client.refreshHandler()) as DownscopedAccessTokenResponse;
+      assert.strictEqual(
+        downscopedCred.access_token,
+        expectedDownscopedCred.access_token
+      );
+      assert.strictEqual(
+        downscopedCred.expiry_date,
+        expectedDownscopedCred.expiry_date
+      );
+    });
+
+    it('should refresh credential when refreshHandler is available in getAccessToken()', async () => {
+      const expectedDownscopedCred = {
+        access_token: 'access_token',
+        expiry_date: 123456789,
+      };
+      client.refreshHandler = async () => {
+        return expectedDownscopedCred;
+      };
+      client.setCredentials({
+        access_token: 'initial-access-token',
+        expiry_date: new Date().getTime() - 1000,
+      });
+      const downscopedCred = await client.getAccessToken();
+      assert.strictEqual(
+        downscopedCred.token,
+        expectedDownscopedCred.access_token
       );
     });
   });
