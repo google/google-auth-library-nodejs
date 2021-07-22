@@ -374,6 +374,126 @@ describe('DownscopedClient', () => {
       );
       scope.done();
     });
+
+    it('should copy source cred expiry time if STS response does not return expiry time', async () => {
+      const now = new Date().getTime();
+      clock = sinon.useFakeTimers(now);
+      const sourceCredentials = client.credentials;
+      const downscopedCredentials = {
+        access_token: 'DOWNSCOPED_CLIENT_ACCESS_TOKEN',
+        expiry_date: now + ONE_HOUR_IN_SECS * 1000,
+      };
+      const stsSuccessfulResponseWithoutExpireInField = Object.assign(
+        stsSuccessfulResponse,
+        {}
+      );
+      delete stsSuccessfulResponseWithoutExpireInField.expires_in;
+      const scope = mockStsBetaTokenExchange([
+        {
+          statusCode: 200,
+          response: stsSuccessfulResponseWithoutExpireInField,
+          request: {
+            grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+            requested_token_type:
+              'urn:ietf:params:oauth:token-type:access_token',
+            subject_token: 'subject_token',
+            subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
+            options:
+              testClientAccessBoundary &&
+              JSON.stringify(testClientAccessBoundary),
+          },
+        },
+      ]);
+      client.setCredentials(sourceCredentials);
+      const downscopedClient = new DownscopedClient(
+        client,
+        testClientAccessBoundary
+      );
+      assert.strictEqual(client.credentials.expiry_date, 1);
+      downscopedClient.setCredentials(downscopedCredentials);
+
+      clock.tick(ONE_HOUR_IN_SECS * 1000 - EXPIRATION_TIME_OFFSET - 1);
+      const tokenResponse = await downscopedClient.getAccessToken();
+      assert.deepStrictEqual(
+        tokenResponse.token,
+        downscopedCredentials.access_token
+      );
+
+      clock.tick(1);
+      const refreshedTokenResponse = await downscopedClient.getAccessToken();
+      assert.deepStrictEqual(
+        refreshedTokenResponse.token,
+        stsSuccessfulResponseWithoutExpireInField.access_token
+      );
+      assert.strictEqual(
+        downscopedClient.credentials.expiry_date,
+        sourceCredentials.expiry_date
+      );
+      scope.done();
+    });
+
+    it('should has no expiry date if source cred has no expiry time and STS response does not return one', async () => {
+      const now = new Date().getTime();
+      clock = sinon.useFakeTimers(now);
+      const downscopedCredentials = {
+        access_token: 'DOWNSCOPED_CLIENT_ACCESS_TOKEN',
+        expiry_date: now + ONE_HOUR_IN_SECS * 1000,
+      };
+      const credentials = {
+        access_token: 'ACCESS_TOKEN',
+      };
+      const stsSuccessfulResponseWithoutExpireInField = Object.assign(
+        stsSuccessfulResponse,
+        {}
+      );
+      delete stsSuccessfulResponseWithoutExpireInField.expires_in;
+      const scope = mockStsBetaTokenExchange([
+        {
+          statusCode: 200,
+          response: stsSuccessfulResponseWithoutExpireInField,
+          request: {
+            grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+            requested_token_type:
+              'urn:ietf:params:oauth:token-type:access_token',
+            subject_token: 'subject_token',
+            subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
+            options:
+              testClientAccessBoundary &&
+              JSON.stringify(testClientAccessBoundary),
+          },
+        },
+      ]);
+
+      assert.strictEqual(client.credentials.expiry_date, 1);
+      client.setCredentials(credentials);
+      assert.strictEqual(client.credentials.expiry_date, undefined);
+
+      const downscopedClient = new DownscopedClient(
+        client,
+        testClientAccessBoundary
+      );
+      downscopedClient.setCredentials(downscopedCredentials);
+
+      clock.tick(ONE_HOUR_IN_SECS * 1000 - EXPIRATION_TIME_OFFSET - 1);
+      const tokenResponse = await downscopedClient.getAccessToken();
+      assert.deepStrictEqual(
+        tokenResponse.token,
+        downscopedCredentials.access_token
+      );
+
+      clock.tick(1);
+      const refreshedTokenResponse = await downscopedClient.getAccessToken();
+      assert.deepStrictEqual(
+        refreshedTokenResponse.token,
+        stsSuccessfulResponseWithoutExpireInField.access_token
+      );
+      assert.strictEqual(
+        downscopedClient.credentials.access_token,
+        stsSuccessfulResponseWithoutExpireInField.access_token
+      );
+      assert.strictEqual(downscopedClient.credentials.expiry_date, null);
+      scope.done();
+    });
   });
 
   describe('getRequestHeader()', () => {

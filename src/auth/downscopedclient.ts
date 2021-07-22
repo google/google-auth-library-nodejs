@@ -214,10 +214,15 @@ export class DownscopedClient extends AuthClient {
       this.credentialAccessBoundary
     );
 
+    const sourceCredExpireDate =
+      this.authClient.credentials?.expiry_date || null;
+    const expiryDate = stsResponse.expires_in
+      ? new Date().getTime() + stsResponse.expires_in * 1000
+      : sourceCredExpireDate;
     // Save response in cached access token.
     this.cachedDownscopedAccessToken = {
       access_token: stsResponse.access_token,
-      expiry_date: new Date().getTime() + stsResponse.expires_in * 1000,
+      expiry_date: expiryDate,
       res: stsResponse.res,
     };
 

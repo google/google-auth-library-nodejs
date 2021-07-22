@@ -120,7 +120,7 @@ export interface StsSuccessfulResponse {
   access_token: string;
   issued_token_type: string;
   token_type: string;
-  expires_in: number;
+  expires_in?: number;
   refresh_token?: string;
   scope: string;
   res?: GaxiosResponse | null;

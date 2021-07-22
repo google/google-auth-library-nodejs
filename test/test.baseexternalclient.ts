@@ -1053,6 +1053,74 @@ describe('BaseExternalAccountClient', () => {
         scopes.forEach(scope => scope.done());
       });
 
+      it('should return credential with no expiry date if STS response does not return one', async () => {
+        clock = sinon.useFakeTimers(0);
+        const now = new Date().getTime();
+        const customThresh = 10 * 1000;
+        const stsSuccessfulResponse2 = Object.assign({}, stsSuccessfulResponse);
+        delete stsSuccessfulResponse2.expires_in;
+        const credentials = {
+          access_token: 'ACCESS_TOKEN',
+          expiry_date: now + ONE_HOUR_IN_SECS * 1000,
+        };
+
+        const scope = mockStsTokenExchange([
+          {
+            statusCode: 200,
+            response: stsSuccessfulResponse2,
+            request: {
+              grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+              audience,
+              scope: 'https://www.googleapis.com/auth/cloud-platform',
+              requested_token_type:
+                'urn:ietf:params:oauth:token-type:access_token',
+              subject_token: 'subject_token_0',
+              subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+            },
+          },
+        ]);
+
+        const client = new TestExternalAccountClient(
+          externalAccountOptionsWithCreds,
+          {
+            // Override 5min threshold with 10 second threshold.
+            eagerRefreshThresholdMillis: customThresh,
+          }
+        );
+        client.setCredentials(credentials);
+        const actualResponse = await client.getAccessToken();
+
+        delete actualResponse.res;
+        assert.deepStrictEqual(actualResponse, {
+          token: credentials.access_token,
+        });
+
+        // Cached credential should be returned.
+        clock.tick(ONE_HOUR_IN_SECS * 1000 - customThresh - 1);
+        const actualCachedResponse = await client.getAccessToken();
+
+        delete actualCachedResponse.res;
+        assert.deepStrictEqual(actualCachedResponse, {
+          token: credentials.access_token,
+        });
+
+        // Simulate credential is expired.
+        // As current time is equal to expirationTime - customThresh,
+        // refresh should be triggered.
+        clock.tick(1);
+        const actualNewCredResponse = await client.getAccessToken();
+
+        // Confirm raw GaxiosResponse appended to response.
+        assertGaxiosResponsePresent(actualNewCredResponse);
+        delete actualNewCredResponse.res;
+        assert.deepStrictEqual(actualNewCredResponse, {
+          token: stsSuccessfulResponse2.access_token,
+        });
+        assert.deepStrictEqual(client.credentials.expiry_date, null);
+
+        scope.done();
+      });
+
       it('should apply basic auth when credentials are provided', async () => {
         const scopes: nock.Scope[] = [];
         scopes.push(

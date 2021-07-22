@@ -378,10 +378,13 @@ export abstract class BaseExternalAccountClient extends AuthClient {
         stsResponse.access_token
       );
     } else {
+      const expireDate = stsResponse.expires_in
+        ? new Date().getTime() + stsResponse.expires_in * 1000
+        : null;
       // Save response in cached access token.
       this.cachedAccessToken = {
         access_token: stsResponse.access_token,
-        expiry_date: new Date().getTime() + stsResponse.expires_in * 1000,
+        expiry_date: expireDate,
         res: stsResponse.res,
       };
     }
