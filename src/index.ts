@@ -27,6 +27,7 @@ export {IAMAuth, RequestMetadata} from './auth/iam';
 export {IdTokenClient, IdTokenProvider} from './auth/idtokenclient';
 export {Claims, JWTAccess} from './auth/jwtaccess';
 export {JWT, JWTOptions} from './auth/jwtclient';
+export {Impersonated, ImpersonatedOptions} from './auth/impersonated';
 export {
   Certificates,
   CodeChallengeMethod,

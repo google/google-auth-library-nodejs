@@ -30,6 +30,7 @@ import {GCPEnv, getEnv} from './envDetect';
 import {JWT, JWTOptions} from './jwtclient';
 import {Headers, OAuth2ClientOptions, RefreshOptions} from './oauth2client';
 import {UserRefreshClient, UserRefreshClientOptions} from './refreshclient';
+import {Impersonated, ImpersonatedOptions} from './impersonated';
 import {
   ExternalAccountClient,
   ExternalAccountClientOptions,
@@ -44,7 +45,11 @@ import {AuthClient} from './authclient';
  * Defines all types of explicit clients that are determined via ADC JSON
  * config file.
  */
-export type JSONClient = JWT | UserRefreshClient | BaseExternalAccountClient;
+export type JSONClient =
+  | JWT
+  | UserRefreshClient
+  | BaseExternalAccountClient
+  | Impersonated;
 
 export interface ProjectIdCallback {
   (err?: Error | null, projectId?: string | null): void;
@@ -86,7 +91,11 @@ export interface GoogleAuthOptions {
   /**
    * Options object passed to the constructor of the client
    */
-  clientOptions?: JWTOptions | OAuth2ClientOptions | UserRefreshClientOptions;
+  clientOptions?:
+    | JWTOptions
+    | OAuth2ClientOptions
+    | UserRefreshClientOptions
+    | ImpersonatedOptions;
 
   /**
    * Required scopes for the desired API request
@@ -126,14 +135,13 @@ export class GoogleAuth {
   // To save the contents of the JSON credential file
   jsonContent: JWTInput | ExternalAccountClientOptions | null = null;
 
-  cachedCredential: JSONClient | Compute | null = null;
+  cachedCredential: JSONClient | Impersonated | Compute | null = null;
 
   /**
    * Scopes populated by the client library by default. We differentiate between
    * these and user defined scopes when deciding whether to use a self-signed JWT.
    */
   defaultScopes?: string | string[];
-
   private keyFilename?: string;
   private scopes?: string | string[];
   private clientOptions?: RefreshOptions;

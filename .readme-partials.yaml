@@ -8,6 +8,7 @@ body: |-
   - [JSON Web Tokens](#json-web-tokens) - Use JWT when you are using a single identity for all users. Especially useful for server->server or server->API communication.
   - [Google Compute](#compute) - Directly use a service account on Google Cloud Platform. Useful for server->server or server->API communication.
   - [Workload Identity Federation](#workload-identity-federation) - Use workload identity federation to access Google Cloud resources from Amazon Web Services (AWS), Microsoft Azure or any identity provider that supports OpenID Connect (OIDC).
+  - [Impersonated Credentials Client](#impersonated-credentials-client) - access protected resources on behalf of another service account.
 
   ## Application Default Credentials
   This library provides an implementation of [Application Default Credentials](https://cloud.google.com/docs/authentication/getting-started)for Node.js. The [Application Default Credentials](https://cloud.google.com/docs/authentication/getting-started) provide a simple way to get authorization credentials for use in calling Google APIs.
@@ -606,3 +607,69 @@ body: |-
   ```
 
   A complete example can be found in [`samples/verifyIdToken-iap.js`](https://github.com/googleapis/google-auth-library-nodejs/blob/master/samples/verifyIdToken-iap.js).
+
+  ## Impersonated Credentials Client
+
+  Google Cloud Impersonated credentials used for [Creating short-lived service account credentials](https://cloud.google.com/iam/docs/creating-short-lived-service-account-credentials).
+
+  Provides authentication for applications where local credentials impersonates a remote service account using [IAM Credentials API](https://cloud.google.com/iam/docs/reference/credentials/rest).
+
+  An Impersonated Credentials Client is instantiated with a `sourceClient`. This
+  should be an auth client with the "Service Account Token Creator" role (`roles/iam.serviceAccountTokenCreator`). `sourceClient` is used by the Impersonated
+  Credentials Client to impersonate a target service account with a specified
+  set of scopes.
+
+  ### Sample Usage
+
+  ```javascript
+  const { GoogleAuth, Impersonated } = require('google-auth-library');
+  const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+
+  async function main() {
+
+    // Acquire source credentials:
+    const auth = new GoogleAuth();
+    const client = await auth.getClient();
+
+    // Impersonate new credentials:
+    let targetClient = new Impersonated({
+      sourceClient: client,
+      targetPrincipal: "impersonated-account@projectID.iam.gserviceaccount.com",
+      lifetime: 30,
+      delegates: [],
+      targetScopes: ["https://www.googleapis.com/auth/cloud-platform"]
+    });
+
+    // Get impersonated credentials:
+    const authHeaders = await targetClient.getRequestHeaders();
+    // Do something with `authHeaders.Authorization`.
+
+    // Use impersonated credentials:
+    const url = 'https://www.googleapis.com/storage/v1/b?project=anotherProjectID'
+    const resp = targetClient.request({ url });
+    for (const bucket of resp.data.items) {
+      console.log(bucket.name);
+    }
+
+    // Use impersonated credentials with google-cloud client library
+    // Note: this works only with certain cloud client libraries utilizing gRPC 
+    //    e.g., SecretManager, KMS, AIPlatform
+    // will not currently work with libraries using REST, e.g., Storage, Compute
+    const smClient = new SecretManagerServiceClient({
+      projectId: anotherProjectID,
+      auth: {
+        getClient: () => targetClient,
+      },
+    });
+    const secretName = 'projects/anotherProjectNumber/secrets/someProjectName/versions/1';
+    const [accessResponse] = await smClient.accessSecretVersion({
+      name: secretName,
+    });
+
+    const responsePayload = accessResponse.payload.data.toString('utf8');
+    // Do something with the secret contained in `responsePayload`.
+  };
+
+  main();
+  ```
+
